@@ -9,18 +9,38 @@ import config from './config';
  *
  * ```
  * {
+ *
  *   queries: [
  *     {
- *       name: 'todo',          // The name of the property passed to Component
+ *       name: 'todo',          // (Optional: defaults to endpoint value)
+ *                              // The name of the property passed to Component
  *                              // that will contain the fetched data
- *       endpoint: 'tasks',     // The endpoint on Loopback server
- *       filter: {              // The filter object passed to Loopback API
- *         where: {done: false}
- *       }
+ *
+ *       endpoint: 'tasks',     // (Required) The endpoint on Loopback server
+ *
+ *       filter: {              // (Optional / object or function)
+ *         where: {done: false} // The filter object passed to Loopback API
+ *       },
+ *
+ *       filter: function (params) {       // function version of filter
+ *         if (!params.page) return false;
+ *         return {
+ *           limit: 30,
+ *           skip: 30 * params.page - 30
+ *         };
+ *       },
+ *
+ *       params: {              // (Optional) Default parameters passed to
+ *         page: 1              // filter function
+ *       },
+ *
+ *       autoLoad: true         // When true (default), query will be fetched as
+ *                              // soon as the component is mounted
  *     },
  *     { ... }
  *   ]
  * }
+ * ```
  *
  * @param  {React.Component} Component The React component that will receive the
  *                                     fetched data
@@ -63,27 +83,37 @@ export function createDataLoader(Component, options = {}) {
        */
       _buildUrl(endpoint, filter) {
         const baseUrl = DataLoader._getBaseUrl();
-        const filterParam = encodeURIComponent(JSON.stringify(filter));
-        return baseUrl + endpoint + '?filter=' + filterParam;
+        let url = baseUrl + endpoint
+        if (filter) {
+          url += '?filter=' + encodeURIComponent(JSON.stringify(filter));
+        }
+        return url;
       },
 
       /**
-       * Maps the queries object to include a url property
+       * Normalizes the queries objects.
        * @param  {array} queries Array of queries objects
-       * @return {array}         Array of queries objects with url property
+       * @return {array}         Array of normalized queries objects
        */
-      _buildUrlsFromQueries(queries) {
-        return queries.map(({name, filter, endpoint}) => {
+      _normalizeQueries(queries) {
+        return queries.map(({name, filter, endpoint, params = {}, autoLoad = true}) => {
+          // Remove leading slash
           if (endpoint.slice(0, 1) === '/') {
             endpoint = endpoint.slice(1);
           }
-          name = name || endpoint;
+          // Remove trailing slash
+          if (endpoint.slice(-1) === '/') {
+            endpoint = endpoint.slice(0,-1);
+          }
+
+          name = name || endpoint.replace(/\W+/g, '-');
 
           return {
             name,
             filter,
             endpoint,
-            url: DataLoader._buildUrl(endpoint, filter)
+            params,
+            autoLoad
           };
         });
       }
@@ -93,25 +123,82 @@ export function createDataLoader(Component, options = {}) {
      * Data fetching is started as soon as possible
      */
     componentWillMount() {
-      this._data = {};
-      const urls = DataLoader._buildUrlsFromQueries(options.queries);
+      this._queries = _.indexBy(DataLoader._normalizeQueries(options.queries), 'name');
+      this._data = _(this._queries)
+        .map(q => [q.name, []])
+        .zipObject()
+        .value();
 
-      _.map(urls, ({name, url}) => {
-        fetch(url)
-          .then(response => {
-            if (!response.ok) throw new Error(response.statusText);
-            return response.json();
-          })
-          .then(json => {
-            this._data[name] = json;
-            this.forceUpdate();
-          });
-      });
+      _.map(this._queries, ({name, autoLoad}) => autoLoad && this.load(name));
+    },
+
+    /**
+     * Load data from Loopback API.
+     *
+     * Options:
+     *
+     * ```
+     * {
+     *   resetParams: false  // When true, previous parameters will be replaced.
+     *                       // When false (default), they will be merged.
+     *   append: false       // When true, new data will be appended to the old data.
+     *                       // When false (default), new data will replace old data.
+     * }
+     * ```
+     *
+     * @param  {string} name    The name of the query to load
+     * @param  {object} params  Parameters to be passed to filter function, if existent
+     * @param  {object} options Options object
+     */
+    load(name, params = {}, options = {}) {
+      const cfg = this._queries[name];
+
+      if (options.resetParams) {
+        cfg.params = {};
+      }
+
+      _.assign(cfg.params, params);
+
+      const filter = typeof cfg.filter === 'function' ?
+        cfg.filter(cfg.params) :
+        cfg.filter;
+
+      if (filter === false) {
+        return;
+      }
+
+      const url = DataLoader._buildUrl(cfg.endpoint, filter);
+
+      const status = cfg.name + '_status';
+      this._data[status] = 'loading';
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) throw new Error(response.statusText);
+          return response.json();
+        })
+        .then(json => {
+          if (options.append) {
+            this._data[cfg.name] = this._data[cfg.name].concat(json);
+          } else {
+            this._data[cfg.name] = json;
+          }
+        })
+        .then(
+          () => this._data[status] = 'ok',
+          (err) => this._data[status] = 'error: ' + err.message
+        )
+        .then(() => this.forceUpdate());
     },
 
     render() {
       return (
-        <Component ref="component" {...this.props} {...this._data} />
+        <Component
+          ref="component"
+          dataloader={this}
+          {...this.props}
+          {...this._data}
+        />
       );
     }
   });

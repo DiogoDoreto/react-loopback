@@ -42,44 +42,55 @@ describe('createDataLoader', () => {
       expect(url).to.equal(result);
     });
 
-    it('_buildUrlsFromQueries should build all urls', () => {
+    it('_normalizeQueries should transform name and endpoint properties', () => {
       const queries = [
         {
-          endpoint: 'users',
-          limit: 20
+          endpoint: 'users'
         },
         {
-          name: 'my-orders',
-          endpoint: 'orders',
-          where: {user_id: 7}
+          endpoint: '/users'
+        },
+        {
+          endpoint: 'users/'
+        },
+        {
+          endpoint: '/users/'
+        },
+        {
+          endpoint: 'users/1/orders'
+        },
+        {
+          name: 'my-users',
+          endpoint: 'users'
         }
       ];
-      const urls = DataLoader._buildUrlsFromQueries(queries);
-      urls.map(item =>
-        expect(item)
-          .to.have.property('url')
-          .that.is.a('string'));
+
+      const results = DataLoader._normalizeQueries(queries);
+
+      for (let i = 0; i <= 3; i++) {
+        expect(results[i]).to.have.property('name', 'users');
+        expect(results[i]).to.have.property('endpoint', 'users');
+      }
+
+      expect(results[4]).to.have.property('name', 'users-1-orders');
+      expect(results[4]).to.have.property('endpoint', 'users/1/orders');
+
+      expect(results[5]).to.have.property('name', 'my-users');
     });
   });
 
   describe('DataLoader', () => {
-
-    function stubFecth() {
+    function stubFecth({result, ok = true, statusText = ''}) {
       const oldFetch = window.fetch;
 
       window.fetch = () => new Promise(resolve => {
         setTimeout(() => {
           resolve({
-            ok: true,
-            json() {
-              return [
-                {name: 'John'},
-                {name: 'Mary'},
-                {name: 'Lucy'}
-              ];
-            }
+            ok,
+            statusText,
+            json: () => result
           });
-        }, 500);
+        }, 300);
       });
 
       window.fetch.restore = () => window.fetch = oldFetch;
@@ -93,8 +104,6 @@ describe('createDataLoader', () => {
     });
 
     it('should fetch data and send to Component', (done) => {
-      stubFecth();
-
       const options = {
         queries: [{
           name: 'myUsers',
@@ -102,19 +111,93 @@ describe('createDataLoader', () => {
         }]
       };
 
+      stubFecth({
+        result: [ {name: 'John'}, {name: 'Mary'}, {name: 'Lucy'} ]
+      });
+
       const Component = createDataLoader(MyUsersCount, options);
 
       const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
-      const comp = dataLoader.refs.component.refs.content;
-      expect(comp).to.have.property('textContent', 'Count: 0');
+      const innerComponent = dataLoader.refs.component;
+      const contentNode = innerComponent.refs.content;
+
+      expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
+      expect(contentNode).to.have.property('textContent', 'Count: 0');
 
       setTimeout(() => {
-        expect(comp).to.have.property('textContent', 'Count: 3');
+        expect(innerComponent.props).to.have.property('myUsers_status', 'ok');
+        expect(contentNode).to.have.property('textContent', 'Count: 3');
         done();
-      }, 600);
+      }, 400);
 
       window.fetch.restore();
     });
+
+    it('should inform when an error occurs', (done) => {
+      const options = {
+        queries: [{
+          name: 'myUsers',
+          endpoint: 'users'
+        }]
+      };
+
+      stubFecth({
+        ok: false,
+        statusText: 'Some error message'
+      });
+
+      const Component = createDataLoader(MyUsersCount, options);
+
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+      const innerComponent = dataLoader.refs.component;
+
+      expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
+
+      setTimeout(() => {
+        expect(innerComponent.props).to.have.property('myUsers_status', 'error: Some error message');
+        done();
+      }, 400);
+
+      window.fetch.restore();
+    });
+
+    it('should accept filter as a function', () => {
+      const options = {
+        queries: [{
+          name: 'myUsers',
+          endpoint: 'users',
+          filter: ({id, page}) => ({
+            id,
+            limit: 10,
+            skip: 10 * page - 10
+          }),
+          params: {
+            id: 42
+          },
+          autoLoad: false
+        }]
+      };
+
+      stubFecth({ok: false});
+
+      const Component = createDataLoader(MyUsersCount, options);
+
+      const oldBuildFn = Component._buildUrl;
+      Component._buildUrl = (endpoint, filter) => {
+        expect(filter).to.have.property('id', 42);
+        expect(filter).to.have.property('limit', 10);
+        expect(filter).to.have.property('skip', 60);
+
+        return oldBuildFn(endpoint, filter);
+      };
+
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+
+      dataLoader.load('myUsers', {page: 7});
+
+      Component._buildUrl = oldBuildFn;
+      window.fetch.restore();
+    })
   });
 
 });
