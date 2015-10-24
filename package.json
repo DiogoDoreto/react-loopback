@@ -1,6 +1,5 @@
 {
   "name": "react-loopback",
-  "private": true,
   "version": "0.1.0",
   "description": "React plugin to load data from a Loopback API server",
   "main": "lib/index",
@@ -9,11 +8,15 @@
     "build": "babel ./src -d lib --ignore \"__tests__\"",
     "build-umd": "webpack src/index.js umd/react-loopback.js",
     "build-min": "webpack -p src/index.js umd/react-loopback.min.js",
+    "build-all": "npm run build && npm run build-min && npm run build-umd",
     "lint": "eslint ./src",
-    "clean": "rimraf dist/*",
+    "clean": "rimraf lib/* umd/*",
     "postinstall": "node -e \"require('fs').stat('lib', function (e, s) { process.exit(e || !s.isDirectory() ? 1 : 0) })\" || npm run build"
   },
-  "repository": "",
+  "bugs": {
+    "url": "https://github.com/DiogoDoreto/react-loopback/issues"
+  },
+  "repository": "DiogoDoreto/react-loopback",
   "keywords": [
     "react",
     "loopback",

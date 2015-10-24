@@ -1,5 +1,8 @@
 # react-loopback
 
+[![npm package](https://img.shields.io/npm/v/react-loopback.svg?style=flat-square)](https://www.npmjs.org/package/react-loopback)
+[![build status](https://img.shields.io/travis/DiogoDoreto/react-loopback/master.svg?style=flat-square)](https://travis-ci.org/DiogoDoreto/react-loopback)
+
 A small library to connect [React](https://facebook.github.io/react/)
 components to data in a [LoopBack](http://loopback.io) API without the need for
 Flux, Redux, etc.
