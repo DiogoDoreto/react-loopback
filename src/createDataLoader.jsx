@@ -2,50 +2,57 @@ import React from 'react';
 import config from './config';
 
 /**
- * A wrapper for a React component that manages the data fetching from Loopback
- * server automatically.
+ * A wrapper for a React component that manages the data fetching from LoopBack
+ * server automatically. The wrapped component will receive the `DataLoader`
+ * instance as `dataloader` property. And, for each query, two extra parameters
+ * will be passed:
  *
- * Options:
+ * - `{name}` → The data received from LoopBack API
+ * - `{name}_status` → A string that can have the following values:
+ *   - `'loading'` → When new data is currently being loaded;
+ *   - `'ok'` → When data was correctly loaded;
+ *   - `'error: {error_message}'` → When an error occurs.
  *
- * ```
+ * The options object:
+ *
+ * ```javascript
  * {
+ *  queries: [
+ *    {
+ *      name: 'todo',          // (Optional: defaults to endpoint value)
+ *                             // The name of the property passed to Component
+ *                             // that will contain the fetched data
  *
- *   queries: [
- *     {
- *       name: 'todo',          // (Optional: defaults to endpoint value)
- *                              // The name of the property passed to Component
- *                              // that will contain the fetched data
+ *      endpoint: 'tasks',     // (Required) The endpoint on Loopback server
  *
- *       endpoint: 'tasks',     // (Required) The endpoint on Loopback server
+ *      filter: {              // (Optional / object or function)
+ *        where: {done: false} // The filter object passed to Loopback API
+ *      },
  *
- *       filter: {              // (Optional / object or function)
- *         where: {done: false} // The filter object passed to Loopback API
- *       },
+ *      filter: function (params) {       // function version of filter
+ *        if (!params.page) return false;
+ *        return {
+ *          limit: 30,
+ *          skip: 30 * params.page - 30
+ *        };
+ *      },
  *
- *       filter: function (params) {       // function version of filter
- *         if (!params.page) return false;
- *         return {
- *           limit: 30,
- *           skip: 30 * params.page - 30
- *         };
- *       },
+ *      params: {              // (Optional) Default parameters passed to
+ *        page: 1              // filter function
+ *      },
  *
- *       params: {              // (Optional) Default parameters passed to
- *         page: 1              // filter function
- *       },
- *
- *       autoLoad: true         // When true (default), query will be fetched as
- *                              // soon as the component is mounted
- *     },
- *     { ... }
- *   ]
+ *      autoLoad: true         // When true (default), query will be fetched as
+ *                             // soon as the component is mounted
+ *    },
+ *    { ... }
+ *  ]
  * }
  * ```
  *
  * @param  {React.Component} Component The React component that will receive the
  *                                     fetched data
  * @param  {object}          options   The options object
- * @return {React.Component}           The wrapper component
+ * @return {DataLoader}                The DataLoader wrapper component
  */
 export function createDataLoader(Component, options = {}) {
   if (!Component) {
@@ -57,7 +64,9 @@ export function createDataLoader(Component, options = {}) {
   }
 
   /**
-   * The wrapper component that will manage the data fetching
+   * The wrapper component that will manage the data fetching. It is the return
+   * value of the `createDataLoader` function and the value of `dataloader`
+   * property of wrapped component.
    */
   const DataLoader = React.createClass({
 
@@ -133,14 +142,15 @@ export function createDataLoader(Component, options = {}) {
     },
 
     /**
-     * Load data from Loopback API.
-     *
-     * Options:
+     * Loads data from LoopBack API. Receives the name of the query to be used, the
+     * aditional parameters to pass to filter function (if existent) and a options
+     * object:
      *
      * ```
      * {
-     *   resetParams: false  // When true, previous parameters will be replaced.
+     *   resetParams: false, // When true, previous parameters will be replaced.
      *                       // When false (default), they will be merged.
+     *
      *   append: false       // When true, new data will be appended to the old data.
      *                       // When false (default), new data will replace old data.
      * }
