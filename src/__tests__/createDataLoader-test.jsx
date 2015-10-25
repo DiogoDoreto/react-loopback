@@ -77,6 +77,55 @@ describe('createDataLoader', () => {
 
       expect(results[5]).to.have.property('name', 'my-users');
     });
+
+    it('_transform_array should return data as array', () => {
+      const data_a = [{id: 1}, {id: 2}, {id: 3}];
+      const data_b = [{id: 4}, {id: 5}];
+      let result;
+
+      result = DataLoader._transform_array(data_a, [], {}, {}, {});
+      expect(result).to.deep.equal(data_a);
+
+      result = DataLoader._transform_array(data_a, data_b, {}, {}, {});
+      expect(result).to.deep.equal(data_a);
+
+      result = DataLoader._transform_array(data_a, data_b, {}, {}, {append: true});
+      expect(result).to.deep.equal(data_b.concat(data_a));
+    });
+
+    it('_transform_object should return data as object', () => {
+      const data_a = [{id: 1}, {id: 2}, {id: 3}];
+      const res_a = {
+        1: {id: 1},
+        2: {id: 2},
+        3: {id: 3}
+      };
+      const data_b = [{key: 4}, {key: 5}];
+      const res_b = {
+        4: {key: 4},
+        5: {key: 5}
+      };
+      const res_ab = {
+        1: {id: 1},
+        2: {id: 2},
+        3: {id: 3},
+        4: {key: 4},
+        5: {key: 5}
+      };
+      let result;
+
+      result = DataLoader._transform_object(data_a, [], {}, {}, {});
+      expect(result).to.deep.equal(res_a);
+
+      result = DataLoader._transform_object(data_b, [], {}, {}, {id: 'key'});
+      expect(result).to.deep.equal(res_b);
+
+      result = DataLoader._transform_object(data_a, res_b, {}, {}, {});
+      expect(result).to.deep.equal(res_ab);
+
+      result = DataLoader._transform_object(data_a, res_b, {}, {}, {reset: true});
+      expect(result).to.deep.equal(res_a);
+    });
   });
 
   describe('DataLoader', () => {
@@ -162,6 +211,7 @@ describe('createDataLoader', () => {
     });
 
     it('should accept filter as a function', () => {
+      let filterWasCalled = false;
       const options = {
         queries: [{
           name: 'myUsers',
@@ -184,6 +234,8 @@ describe('createDataLoader', () => {
 
       const oldBuildFn = Component._buildUrl;
       Component._buildUrl = (endpoint, filter) => {
+        filterWasCalled = true;
+
         expect(filter).to.have.property('id', 42);
         expect(filter).to.have.property('limit', 10);
         expect(filter).to.have.property('skip', 60);
@@ -194,10 +246,49 @@ describe('createDataLoader', () => {
       const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
 
       dataLoader.load('myUsers', {page: 7});
+      expect(filterWasCalled).to.be.true;
 
       Component._buildUrl = oldBuildFn;
       window.fetch.restore();
-    })
+    });
+
+    it('should accept a custom transform function', (done) => {
+      const fetchData = [ {name: 'John'}, {name: 'Mary'}, {name: 'Lucy'} ];
+      let transformWasCalled = false;
+      const options = {
+        queries: [{
+          endpoint: 'users',
+          filter: {limit: 10},
+          params: {page: 4},
+          transform: (json, data, filter, params, options) => {
+            transformWasCalled = true;
+
+            expect(json).to.deep.equal(fetchData);
+            expect(data).to.be.an('array')
+              .that.has.length(0);
+            expect(filter).to.deep.equal({limit: 10});
+            expect(params).to.deep.equal({page: 4, id: 10});
+            expect(options).to.deep.equal({key: 'value'});
+          }
+        }]
+      };
+
+      stubFecth({
+        result: fetchData
+      });
+
+      const Component = createDataLoader(MyUsersCount, options);
+
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+      dataLoader.load('users', {id: 10}, {key: 'value'});
+
+      setTimeout(() => {
+        expect(transformWasCalled).to.be.true;
+        done();
+      }, 400);
+
+      window.fetch.restore();
+    });
   });
 
 });

@@ -41,8 +41,29 @@ import config from './config';
  *        page: 1              // filter function
  *      },
  *
- *      autoLoad: true         // When true (default), query will be fetched as
+ *      autoLoad: true,        // When true (default), query will be fetched as
  *                             // soon as the component is mounted
+ *
+ *      transform: 'array',    // Transform function that will receive new data
+ *                             // and return the data passed to inner component.
+ *                             // When equal to 'array' (default), the data is
+ *                             // kept as an array of objects.
+ *                             // When equal to 'object', the data is kept as a
+ *                             // key-value object, where key is the id field.
+ *                             // You can pass a custom function as well.
+ *
+ *      transform: function (json, data, filter, params, options) {
+ *                             // Parameters:
+ *                             // json: The new data from LoopBack API
+ *                             // data: The existent data
+ *                             // filter: The filter object used to request data
+ *                             // params: The params object passed to filter function
+ *                             // options: The options object passed to load method
+ *                             //
+ *                             // Is recommended that you don't modify the data
+ *                             // parameter. Instead create and return a new
+ *                             // object.
+ *      }
  *    },
  *    { ... }
  *  ]
@@ -105,7 +126,14 @@ export function createDataLoader(Component, options = {}) {
        * @return {array}         Array of normalized queries objects
        */
       _normalizeQueries(queries) {
-        return queries.map(({name, filter, endpoint, params = {}, autoLoad = true}) => {
+        return queries.map(({
+          name,
+          filter,
+          endpoint,
+          params = {},
+          autoLoad = true,
+          transform = 'array'
+        }) => {
           // Remove leading slash
           if (endpoint.slice(0, 1) === '/') {
             endpoint = endpoint.slice(1);
@@ -115,6 +143,13 @@ export function createDataLoader(Component, options = {}) {
             endpoint = endpoint.slice(0,-1);
           }
 
+          if (typeof transform === 'string') {
+            transform = this['_transform_' + transform];
+          }
+          if (typeof transform !== 'function') {
+            throw new Error('Unknown type of transform option:' + (typeof transform));
+          }
+
           name = name || endpoint.replace(/\W+/g, '-');
 
           return {
@@ -122,9 +157,46 @@ export function createDataLoader(Component, options = {}) {
             filter,
             endpoint,
             params,
-            autoLoad
+            autoLoad,
+            transform
           };
         });
+      },
+
+      /**
+       * Transform function that keeps data as array, optionally concatening new
+       * results.
+       * @param  {array}  json    JSON data received from LoopBack API
+       * @param  {array}  data    Previouly received data
+       * @param  {object} filter  Filter object used to query LoopBack API
+       * @param  {object} params  Params object passed to filter function
+       * @param  {object} options Options object passed to load method
+       * @return {array}          The resulting array that inner component will
+       *                          receive
+       */
+      _transform_array(json, data, filter, params, {append = false}) {
+        return append ?
+          data.concat(json) :
+          json;
+      },
+
+      /**
+       * Transform function that keeps data as a key-value object, where key is
+       * the id of the row and value is the row.
+       * @param  {array}  json    JSON data received from LoopBack API
+       * @param  {array}  data    Previouly received data
+       * @param  {object} filter  Filter object used to query LoopBack API
+       * @param  {object} params  Params object passed to filter function
+       * @param  {object} options Options object passed to load method
+       * @return {object}         The resulting object that inner component will
+       *                          receive
+       */
+      _transform_object(json, data, filter, params, {id = 'id', reset = false}) {
+        const newData = _.indexBy(json, id);
+        if (reset) {
+          return newData;
+        }
+        return _.assign({}, data, newData);
       }
     },
 
@@ -151,8 +223,15 @@ export function createDataLoader(Component, options = {}) {
      *   resetParams: false, // When true, previous parameters will be replaced.
      *                       // When false (default), they will be merged.
      *
-     *   append: false       // When true, new data will be appended to the old data.
+     *   append: false       // (used only with 'array' transform function)
+     *                       // When true, new data will be appended to the old data.
      *                       // When false (default), new data will replace old data.
+     *
+     *   id: 'id'            // (used only with 'object' transform function)
+     *                       // The name of id field to be used as key
+
+     *   reset: false        // (used only with 'object' transform function)
+     *                       // When true, the new data will replace old data.
      * }
      * ```
      *
@@ -188,11 +267,12 @@ export function createDataLoader(Component, options = {}) {
           return response.json();
         })
         .then(json => {
-          if (options.append) {
-            this._data[cfg.name] = this._data[cfg.name].concat(json);
-          } else {
-            this._data[cfg.name] = json;
-          }
+          this._data[cfg.name] = cfg.transform(
+            json,
+            this._data[cfg.name],
+            filter,
+            cfg.params,
+            options);
         })
         .then(
           () => this._data[status] = 'ok',

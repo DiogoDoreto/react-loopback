@@ -108,35 +108,56 @@ The options object:
 
 ```javascript
 {
- queries: [
-   {
-     name: 'todo',          // (Optional: defaults to endpoint value)
-                            // The name of the property passed to Component
-                            // that will contain the fetched data
+  queries: [
+    {
+      name: 'todo',          // (Optional: defaults to endpoint value)
+                             // The name of the property passed to Component
+                             // that will contain the fetched data
 
-     endpoint: 'tasks',     // (Required) The endpoint on Loopback server
+      endpoint: 'tasks',     // (Required) The endpoint on Loopback server
 
-     filter: {              // (Optional / object or function)
-       where: {done: false} // The filter object passed to Loopback API
-     },
+      filter: {              // (Optional / object or function)
+        where: {done: false} // The filter object passed to Loopback API
+      },
 
-     filter: function (params) {       // function version of filter
-       if (!params.page) return false;
-       return {
-         limit: 30,
-         skip: 30 * params.page - 30
-       };
-     },
+      filter: function (params) {       // function version of filter
+        if (!params.page) return false;
+        return {
+          limit: 30,
+          skip: 30 * params.page - 30
+        };
+      },
 
-     params: {              // (Optional) Default parameters passed to
-       page: 1              // filter function
-     },
+      params: {              // (Optional) Default parameters passed to
+        page: 1              // filter function
+      },
 
-     autoLoad: true         // When true (default), query will be fetched as
-                            // soon as the component is mounted
-   },
-   { ... }
- ]
+      autoLoad: true,        // When true (default), query will be fetched as
+                             // soon as the component is mounted
+
+      transform: 'array',    // Transform function that will receive new data
+                             // and return the data passed to inner component.
+                             // When equal to 'array' (default), the data is
+                             // kept as an array of objects.
+                             // When equal to 'object', the data is kept as a
+                             // key-value object, where key is the id field.
+                             // You can pass a custom function as well.
+
+      transform: function (json, data, filter, params, options) {
+                             // Parameters:
+                             // json: The new data from LoopBack API
+                             // data: The existent data
+                             // filter: The filter object used to request data
+                             // params: The params object passed to filter function
+                             // options: The options object passed to load method
+                             //
+                             // Is recommended that you don't modify the data
+                             // parameter. Instead create and return a new
+                             // object.
+      }
+    },
+    { ... }
+  ]
 }
 ```
 
