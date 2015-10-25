@@ -102,6 +102,7 @@ This is the global configuration manager for `react-loopback`. The current used
 keys are:
 
 - **baseUrl** → The base URL used to communicate with LoopBack REST API.
+- **access_token** → When set, all further requests will contain the access_token.
 
 #### config.get(key: string): any
 

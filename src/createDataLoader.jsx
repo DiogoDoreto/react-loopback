@@ -117,6 +117,11 @@ export function createDataLoader(Component, options = {}) {
         if (filter) {
           url += '?filter=' + encodeURIComponent(JSON.stringify(filter));
         }
+        const token = config.get('access_token') || '';
+        if (token) {
+          url += filter ? '&' : '?';
+          url += 'access_token=' + token;
+        }
         return url;
       },
 

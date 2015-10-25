@@ -38,8 +38,14 @@ describe('createDataLoader', () => {
       const endpoint = 'users'
       const result = '/users?filter=' + encodeURIComponent(JSON.stringify(filter));
 
-      const url = DataLoader._buildUrl(endpoint, filter);
-      expect(url).to.equal(result);
+      const url1 = DataLoader._buildUrl(endpoint, filter);
+      expect(url1).to.equal(result);
+
+      const token = 'abc123';
+      config.set('access_token', token);
+
+      const url2 = DataLoader._buildUrl(endpoint, filter);
+      expect(url2).to.equal(result + '&access_token=' + token);
     });
 
     it('_normalizeQueries should transform name and endpoint properties', () => {
