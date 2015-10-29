@@ -49,7 +49,7 @@
     "null-loader": "^0.1.1",
     "open": "0.0.5",
     "phantomjs": "^1.9.18",
-    "react": "0.14.0",
+    "react": "^0.14.1",
     "react-addons-test-utils": "^0.14.0",
     "react-dom": "^0.14.0",
     "rimraf": "^2.4.3",
@@ -62,7 +62,7 @@
     "lodash": "^3.10.1"
   },
   "peerDependencies": {
-    "react": "0.14.0"
+    "react": "^0.14.1"
   },
   "maintainers": [
     {
