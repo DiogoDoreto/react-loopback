@@ -138,15 +138,21 @@ describe('createDataLoader', () => {
     function stubFecth({result, ok = true, statusText = ''}) {
       const oldFetch = window.fetch;
 
-      window.fetch = () => new Promise(resolve => {
-        setTimeout(() => {
-          resolve({
-            ok,
-            statusText,
-            json: () => result
-          });
-        }, 300);
-      });
+      window.fetch = function () {
+        window.fetch.callCount = 1 + window.fetch.callCount;
+
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve({
+              ok,
+              statusText,
+              json: () => result
+            });
+          }, 300);
+        });
+      };
+
+      window.fetch.callCount = 0;
 
       window.fetch.restore = () => window.fetch = oldFetch;
     }
@@ -176,16 +182,17 @@ describe('createDataLoader', () => {
       const innerComponent = dataLoader.refs.component;
       const contentNode = innerComponent.refs.content;
 
-      expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
-      expect(contentNode).to.have.property('textContent', 'Count: 0');
+      setTimeout(() => {
+        expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
+        expect(contentNode).to.have.property('textContent', 'Count: 0');
+      }, 220);
 
       setTimeout(() => {
         expect(innerComponent.props).to.have.property('myUsers_status', 'ok');
         expect(contentNode).to.have.property('textContent', 'Count: 3');
+        window.fetch.restore();
         done();
-      }, 400);
-
-      window.fetch.restore();
+      }, 620);
     });
 
     it('should inform when an error occurs', (done) => {
@@ -206,17 +213,18 @@ describe('createDataLoader', () => {
       const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
       const innerComponent = dataLoader.refs.component;
 
-      expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
+      setTimeout(() => {
+        expect(innerComponent.props).to.have.property('myUsers_status', 'loading');
+      }, 220);
 
       setTimeout(() => {
         expect(innerComponent.props).to.have.property('myUsers_status', 'error: Some error message');
+        window.fetch.restore();
         done();
-      }, 400);
-
-      window.fetch.restore();
+      }, 620);
     });
 
-    it('should accept filter as a function', () => {
+    it('should accept filter as a function', (done) => {
       let filterWasCalled = false;
       const options = {
         queries: [{
@@ -252,10 +260,14 @@ describe('createDataLoader', () => {
       const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
 
       dataLoader.load('myUsers', {page: 7});
-      expect(filterWasCalled).to.be.true;
 
-      Component._buildUrl = oldBuildFn;
-      window.fetch.restore();
+      setTimeout(() => {
+        expect(filterWasCalled).to.be.true;
+
+        Component._buildUrl = oldBuildFn;
+        window.fetch.restore();
+        done();
+      }, 220);
     });
 
     it('should accept a custom transform function', (done) => {
@@ -290,10 +302,38 @@ describe('createDataLoader', () => {
 
       setTimeout(() => {
         expect(transformWasCalled).to.be.true;
+        window.fetch.restore();
         done();
-      }, 400);
+      }, 620);
+    });
 
-      window.fetch.restore();
+    it('should not call load multiple times in a short period', (done) => {
+      const options = {
+        queries: [{
+          endpoint: 'users',
+          filter: (params) => {
+            expect(params).to.deep.equal({
+              foo: 1,
+              bar: 2
+            });
+            return {};
+          }
+        }]
+      };
+
+      stubFecth({ result: [] });
+
+      const Component = createDataLoader(MyUsersCount, options);
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+
+      dataLoader.load('users', { foo: 1 });
+      dataLoader.load('users', { bar: 2 });
+
+      setTimeout(() => {
+        expect(fetch.callCount).to.equal(1);
+        window.fetch.restore();
+        done();
+      }, 220);
     });
   });
 

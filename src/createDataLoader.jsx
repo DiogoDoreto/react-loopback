@@ -1,5 +1,6 @@
 import React from 'react';
 import config from './config';
+import { debounce } from './util'
 
 /**
  * A wrapper for a React component that manages the data fetching from LoopBack
@@ -209,12 +210,17 @@ export function createDataLoader(Component, options = {}) {
      * Data fetching is started as soon as possible
      */
     componentWillMount() {
+      // creates a debounced version of load function
+      this._load = debounce(this._load, 200, false);
+
+      // creates internal structures
       this._queries = _.indexBy(DataLoader._normalizeQueries(options.queries), 'name');
       this._data = _(this._queries)
         .map(q => [q.name, []])
         .zipObject()
         .value();
 
+      // autoload, if allowed
       _.map(this._queries, ({name, autoLoad}) => autoLoad && this.load(name));
     },
 
@@ -252,6 +258,12 @@ export function createDataLoader(Component, options = {}) {
       }
 
       _.assign(cfg.params, params);
+
+      this._load(name, options);
+    },
+
+    _load(name, options) {
+      const cfg = this._queries[name];
 
       const filter = typeof cfg.filter === 'function' ?
         cfg.filter(cfg.params) :
