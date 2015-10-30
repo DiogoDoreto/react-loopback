@@ -265,6 +265,7 @@ export function createDataLoader(Component, options = {}) {
 
       const status = cfg.name + '_status';
       this._data[status] = 'loading';
+      this.forceUpdate();
 
       fetch(url)
         .then(response => {
