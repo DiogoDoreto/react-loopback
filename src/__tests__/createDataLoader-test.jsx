@@ -335,6 +335,28 @@ describe('createDataLoader', () => {
         done();
       }, 220);
     });
-  });
 
+    it('should call load for subsequent calls on different endpoints', (done) => {
+      const options = {
+        queries: [
+          { endpoint: 'users' },
+          { endpoint: 'orders' }
+        ]
+      };
+
+      stubFecth({ result: [] });
+
+      const Component = createDataLoader(MyUsersCount, options);
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+
+      dataLoader.load('users');
+      dataLoader.load('orders');
+
+      setTimeout(() => {
+        expect(fetch.callCount).to.equal(2);
+        window.fetch.restore();
+        done();
+      }, 220);
+    });
+  });
 });

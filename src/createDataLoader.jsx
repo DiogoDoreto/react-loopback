@@ -210,15 +210,19 @@ export function createDataLoader(Component, options = {}) {
      * Data fetching is started as soon as possible
      */
     componentWillMount() {
-      // creates a debounced version of load function
-      this._load = debounce(this._load, 200, false);
-
       // creates internal structures
       this._queries = _.indexBy(DataLoader._normalizeQueries(options.queries), 'name');
       this._data = _(this._queries)
         .map(q => [q.name, []])
         .zipObject()
         .value();
+
+
+      // creates a debounced version of load function for each query
+      this._queries = _.mapValues(this._queries, q => ({
+        ...q,
+        load: debounce((options) => this._load(q.name, options), 200, false)
+      }));
 
       // autoload, if allowed
       _.map(this._queries, ({name, autoLoad}) => autoLoad && this.load(name));
@@ -259,7 +263,7 @@ export function createDataLoader(Component, options = {}) {
 
       _.assign(cfg.params, params);
 
-      this._load(name, options);
+      cfg.load(options);
     },
 
     _load(name, options) {
