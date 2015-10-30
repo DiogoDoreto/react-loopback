@@ -1,6 +1,6 @@
 {
   "name": "react-loopback",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "React plugin to load data from a Loopback API server",
   "main": "lib/index",
   "scripts": {
