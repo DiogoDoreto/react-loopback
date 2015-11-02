@@ -158,6 +158,14 @@ describe('createDataLoader', () => {
     }
 
     const MyUsersCount = React.createClass({
+      getText () {
+        return this.refs.content.textContent;
+      },
+
+      sumValues (a, b) {
+        return a + b;
+      },
+
       render () {
         const {myUsers=[]} = this.props;
         return <span ref="content">Count: {myUsers.length}</span>;
@@ -357,6 +365,26 @@ describe('createDataLoader', () => {
         window.fetch.restore();
         done();
       }, 220);
+    });
+
+    it('should call inner component method specified on extendMethods', () => {
+      const options = {
+        extendMethods: [ 'getText', 'sumValues' ],
+        queries: [
+          { endpoint: 'users' }
+        ]
+      };
+
+      stubFecth({ result: [] });
+
+      const Component = createDataLoader(MyUsersCount, options);
+      const dataLoader = ReactTestUtils.renderIntoDocument(<Component />);
+
+      const result1 = dataLoader.getText();
+      expect(result1).to.equal('Count: 0');
+
+      const result2 = dataLoader.sumValues(3, 5);
+      expect(result2).to.equal(8);
     });
   });
 });

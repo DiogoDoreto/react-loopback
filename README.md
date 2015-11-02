@@ -135,7 +135,11 @@ The options object:
 
 ```javascript
 {
-  queries: [
+  extendMethods: [           // (Optional) Array of component methods that
+    'method_a'               // should still be available on wrapper
+  ],
+
+  queries: [                 // (Required) Array of queries to be made
     {
       name: 'todo',          // (Optional: defaults to endpoint value)
                              // The name of the property passed to Component

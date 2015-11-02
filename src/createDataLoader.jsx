@@ -18,7 +18,11 @@ import { debounce } from './util'
  *
  * ```javascript
  * {
- *  queries: [
+ *  extendMethods: [           // (Optional) Array of component methods that
+ *    'method_a'               // should still be available on wrapper
+ *  ],
+ *
+ *  queries: [                 // (Required) Array of queries to be made
  *    {
  *      name: 'todo',          // (Optional: defaults to endpoint value)
  *                             // The name of the property passed to Component
@@ -85,13 +89,7 @@ export function createDataLoader(Component, options = {}) {
     throw new Error('options.queries is required');
   }
 
-  /**
-   * The wrapper component that will manage the data fetching. It is the return
-   * value of the `createDataLoader` function and the value of `dataloader`
-   * property of wrapped component.
-   */
-  const DataLoader = React.createClass({
-
+  const spec = {
     statics: {
       /**
        * Get baseUrl from config and make sure there is a slash at the end.
@@ -313,7 +311,24 @@ export function createDataLoader(Component, options = {}) {
         />
       );
     }
+  };
+
+  /**
+   * Create the methods of inner component directly on wrapper
+   */
+  const { extendMethods = [] } = options;
+  extendMethods.forEach(methodName => {
+    spec[methodName] = function (...args) {
+      return this.refs.component[methodName](...args);
+    };
   });
+
+  /**
+   * The wrapper component that will manage the data fetching. It is the return
+   * value of the `createDataLoader` function and the value of `dataloader`
+   * property of wrapped component.
+   */
+  const DataLoader = React.createClass(spec);
 
   return DataLoader;
 }
